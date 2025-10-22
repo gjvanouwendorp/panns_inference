@@ -2,9 +2,20 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 import librosa
+import torch
 import panns_inference
 from panns_inference import AudioTagging, SoundEventDetection, labels
 
+
+def get_preferred_device():
+    try:
+        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available() and getattr(torch.backends.mps, "is_built", lambda: True)():
+            return "mps"
+    except Exception:
+        pass
+    if torch.cuda.is_available():
+        return "cuda"
+    return "cpu"
 
 def print_audio_tagging_result(clipwise_output):
     """Visualization of audio tagging result.
@@ -51,7 +62,8 @@ def plot_sound_event_detection_result(framewise_output):
 if __name__ == '__main__':
     """Example of using panns_inferece for audio tagging and sound evetn detection.
     """
-    device = 'cpu' # 'cuda' | 'cpu'
+    device = get_preferred_device()  # 'mps' | 'cuda' | 'cpu'
+    print('Using device: {}'.format(device))
     audio_path = 'resources/R9_ZSCveAHg_7s.wav'
     (audio, _) = librosa.core.load(audio_path, sr=32000, mono=True)
     audio = audio[None, :]  # (batch_size, segment_samples)
