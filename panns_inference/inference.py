@@ -36,8 +36,11 @@ class AudioTagging(object):
             zenodo_path = 'https://zenodo.org/record/3987831/files/Cnn14_mAP%3D0.431.pth?download=1'
             os.system('wget -O "{}" "{}"'.format(checkpoint_path, zenodo_path))
 
-        if device == 'cuda' and torch.cuda.is_available():
+        # Resolve device preference (support MPS on Apple Silicon)
+        if device in ('cuda', 'gpu') and torch.cuda.is_available():
             self.device = 'cuda'
+        elif device in ('mps', 'metal') and hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            self.device = 'mps'
         else:
             self.device = 'cpu'
         
@@ -52,16 +55,16 @@ class AudioTagging(object):
         else:
             self.model = model
 
-        checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        # Load checkpoint onto CPU first, then move model to the selected device
+        checkpoint = torch.load(checkpoint_path, map_location='cpu')
         self.model.load_state_dict(checkpoint['model'])
+        self.model.to(self.device)
 
-        # Parallel
-        if 'cuda' in str(self.device):
-            self.model.to(self.device)
+        # Parallel only for CUDA (DataParallel)
+        if self.device == 'cuda' and torch.cuda.device_count() > 1:
             print('GPU number: {}'.format(torch.cuda.device_count()))
             self.model = torch.nn.DataParallel(self.model)
-        else:
-            print('Using CPU.')
+        print('Using device: {}'.format(self.device))
 
     def inference(self, audio):
         audio = move_data_to_device(audio, self.device)
@@ -94,8 +97,11 @@ class SoundEventDetection(object):
             create_folder(os.path.dirname(checkpoint_path))
             os.system('wget -O "{}" https://zenodo.org/record/3987831/files/Cnn14_DecisionLevelMax_mAP%3D0.385.pth?download=1'.format(checkpoint_path))
 
-        if device == 'cuda' and torch.cuda.is_available():
+        # Resolve device preference (support MPS on Apple Silicon)
+        if device in ('cuda', 'gpu') and torch.cuda.is_available():
             self.device = 'cuda'
+        elif device in ('mps', 'metal') and hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            self.device = 'mps'
         else:
             self.device = 'cpu'
         
@@ -110,16 +116,16 @@ class SoundEventDetection(object):
         else:
             self.model = model
         
-        checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        # Load checkpoint onto CPU first, then move model to the selected device
+        checkpoint = torch.load(checkpoint_path, map_location='cpu')
         self.model.load_state_dict(checkpoint['model'])
+        self.model.to(self.device)
 
-        # Parallel
-        if 'cuda' in str(self.device):
-            self.model.to(self.device)
+        # Parallel only for CUDA (DataParallel)
+        if self.device == 'cuda' and torch.cuda.device_count() > 1:
             print('GPU number: {}'.format(torch.cuda.device_count()))
             self.model = torch.nn.DataParallel(self.model)
-        else:
-            print('Using CPU.')
+        print('Using device: {}'.format(self.device))
 
     def inference(self, audio):
         audio = move_data_to_device(audio, self.device)
